@@ -139,8 +139,16 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Registration error:", error);
+
+    // Provide more specific error messages in development
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const isDev = process.env.NODE_ENV === "development";
+
     return NextResponse.json(
-      { success: false, error: "An error occurred during registration" },
+      {
+        success: false,
+        error: isDev ? `Registration failed: ${errorMessage}` : "An error occurred during registration"
+      },
       { status: 500 }
     );
   }
