@@ -47,9 +47,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error("Invalid email or password");
         }
 
-        if (!user.emailVerified) {
-          throw new Error("Please verify your email before signing in");
-        }
+        // TODO: Re-enable email verification once email sending is implemented
+        // if (!user.emailVerified) {
+        //   throw new Error("Please verify your email before signing in");
+        // }
 
         return {
           id: user.id,
@@ -119,8 +120,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   events: {
     async createUser({ user }) {
-      // Create default preferences and stats for new users
+      // Create default preferences and stats for new users (OAuth)
       if (user.id) {
+        // Generate username for OAuth users from email
+        let username = user.email?.split("@")[0]?.toLowerCase().replace(/[^a-z0-9_-]/g, "") || `user_${user.id.slice(0, 8)}`;
+
+        // Ensure username is unique by appending random suffix if needed
+        const existingUser = await prisma.user.findUnique({ where: { username } });
+        if (existingUser && existingUser.id !== user.id) {
+          username = `${username}_${Math.random().toString(36).slice(2, 6)}`;
+        }
+
+        // Update user with generated username and copy name/image to app fields
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            username,
+            displayName: user.name || username,
+            avatarUrl: user.image,
+          },
+        });
+
         await prisma.userPreferences.create({
           data: {
             userId: user.id,

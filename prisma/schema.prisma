@@ -23,9 +23,11 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   passwordHash  String?
-  username      String    @unique
-  displayName   String?
-  avatarUrl     String?
+  username      String?   @unique // Optional for OAuth users
+  name          String?   // Required by NextAuth PrismaAdapter
+  image         String?   // Required by NextAuth PrismaAdapter
+  displayName   String?   // App-specific display name
+  avatarUrl     String?   // App-specific avatar
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
