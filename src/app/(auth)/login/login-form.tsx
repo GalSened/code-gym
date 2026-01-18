@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui";
 import { Form, FormInput, FormCheckbox } from "@/components/forms";
@@ -10,14 +10,18 @@ import { loginSchema, LoginFormData } from "@/lib/validations";
 
 export function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
-  const error = searchParams.get("error");
-
+  const [callbackUrl, setCallbackUrl] = React.useState("/dashboard");
   const [isLoading, setIsLoading] = React.useState(false);
-  const [authError, setAuthError] = React.useState<string | null>(
-    error === "CredentialsSignin" ? "Invalid email or password" : null
-  );
+  const [authError, setAuthError] = React.useState<string | null>(null);
+
+  // Get search params on client side only
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const callback = params.get("callbackUrl");
+    const error = params.get("error");
+    if (callback) setCallbackUrl(callback);
+    if (error === "CredentialsSignin") setAuthError("Invalid email or password");
+  }, []);
 
   const handleSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
