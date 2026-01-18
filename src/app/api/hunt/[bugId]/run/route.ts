@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { executeCode, wrapCodeWithTestHarness, compareOutputs } from "@/lib/services/piston";
-import { TestCase } from "@/types";
 
 interface RouteParams {
-  params: Promise<{ challengeId: string }>;
+  params: Promise<{ bugId: string }>;
+}
+
+interface TestCase {
+  id: string;
+  input: string;
+  expectedOutput: string;
+  isHidden?: boolean;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -19,7 +25,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { challengeId } = await params;
+    const { bugId } = await params;
     const body = await request.json();
     const { code, language } = body;
 
@@ -30,25 +36,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Fetch challenge
-    const challenge = await prisma.challenge.findUnique({
-      where: { id: challengeId, isActive: true },
+    // Fetch bug
+    const bug = await prisma.bug.findUnique({
+      where: { id: bugId, isActive: true },
     });
 
-    if (!challenge) {
+    if (!bug) {
       return NextResponse.json(
-        { error: "Challenge not found" },
+        { error: "Bug not found" },
         { status: 404 }
       );
     }
 
     // Parse test cases from JSON field - only visible ones for run
-    const allTestCases = (challenge.testCases as unknown) as TestCase[];
-    const visibleTestCases = allTestCases.filter((tc: TestCase) => !tc.isHidden);
+    const allTestCases = (bug.testCases as unknown) as TestCase[];
+    const visibleTestCases = allTestCases.filter((tc) => !tc.isHidden);
 
     // Run code against each visible test case
     const results = await Promise.all(
-      visibleTestCases.map(async (testCase: TestCase) => {
+      visibleTestCases.map(async (testCase) => {
         // Wrap code with test harness
         const wrappedCode = wrapCodeWithTestHarness(code, language, testCase.input);
 

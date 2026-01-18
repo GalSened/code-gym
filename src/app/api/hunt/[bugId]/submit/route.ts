@@ -2,18 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { executeCode, wrapCodeWithTestHarness, compareOutputs } from "@/lib/services/piston";
-import { TestCase } from "@/types";
 
 interface RouteParams {
-  params: Promise<{ challengeId: string }>;
+  params: Promise<{ bugId: string }>;
 }
 
-// XP rewards by difficulty
-const XP_REWARDS: Record<string, number> = {
-  easy: 10,
-  medium: 25,
-  hard: 50,
-};
+interface TestCase {
+  id: string;
+  input: string;
+  expectedOutput: string;
+  isHidden?: boolean;
+}
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
@@ -26,9 +25,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { challengeId } = await params;
+    const { bugId } = await params;
     const body = await request.json();
-    const { code, language, hintsUsed = 0 } = body;
+    const { code, language } = body;
 
     if (!code || !language) {
       return NextResponse.json(
@@ -37,35 +36,35 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Fetch challenge
-    const challenge = await prisma.challenge.findUnique({
-      where: { id: challengeId, isActive: true },
+    // Fetch bug
+    const bug = await prisma.bug.findUnique({
+      where: { id: bugId, isActive: true },
     });
 
-    if (!challenge) {
+    if (!bug) {
       return NextResponse.json(
-        { error: "Challenge not found" },
+        { error: "Bug not found" },
         { status: 404 }
       );
     }
 
-    // Check if user has already solved this challenge
-    const existingPassedSubmission = await prisma.challengeSubmission.findFirst({
+    // Check if user has already fixed this bug
+    const existingPassedSubmission = await prisma.bugSubmission.findFirst({
       where: {
         userId: session.user.id,
-        challengeId,
+        bugId,
         status: "passed",
       },
     });
 
-    const alreadySolved = !!existingPassedSubmission;
+    const alreadyFixed = !!existingPassedSubmission;
 
-    // Parse all test cases from JSON field
-    const allTestCases = (challenge.testCases as unknown) as TestCase[];
+    // Parse ALL test cases from JSON field
+    const allTestCases = (bug.testCases as unknown) as TestCase[];
 
     // Run code against ALL test cases
     const results = await Promise.all(
-      allTestCases.map(async (testCase: TestCase) => {
+      allTestCases.map(async (testCase) => {
         const wrappedCode = wrapCodeWithTestHarness(code, language, testCase.input);
         const result = await executeCode(wrappedCode, language, undefined, 10000);
         const passed = result.success && compareOutputs(testCase.expectedOutput, result.output);
@@ -87,30 +86,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const totalCount = results.length;
     const allPassed = passedCount === totalCount;
 
-    // Calculate average execution time
-    const avgExecutionTime = Math.round(
-      results.reduce((sum, r) => sum + (r.executionTime || 0), 0) / results.length
-    );
-
     // Create submission record
-    const submission = await prisma.challengeSubmission.create({
+    await prisma.bugSubmission.create({
       data: {
         userId: session.user.id,
-        challengeId,
-        code,
-        language,
+        bugId,
+        fixedCode: code,
         status: allPassed ? "passed" : "failed",
-        testsPassed: passedCount,
-        testsTotal: totalCount,
-        executionTime: avgExecutionTime,
-        hintsUsed,
+        xpAwarded: 0, // Will update if passing
       },
     });
 
-    // Award XP only if this is first time solving
+    // Award XP only if this is first time fixing
     let xpAwarded = 0;
-    if (allPassed && !alreadySolved) {
-      xpAwarded = XP_REWARDS[challenge.difficulty] || 10;
+    if (allPassed && !alreadyFixed) {
+      xpAwarded = bug.xpReward;
+
+      // Update the submission with XP awarded
+      await prisma.bugSubmission.updateMany({
+        where: {
+          userId: session.user.id,
+          bugId,
+          status: "passed",
+        },
+        data: {
+          xpAwarded,
+        },
+      });
 
       // Update user stats
       await prisma.userStats.upsert({
@@ -118,11 +120,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         create: {
           userId: session.user.id,
           totalXp: xpAwarded,
-          challengesSolved: 1,
+          bugsFixed: 1,
         },
         update: {
           totalXp: { increment: xpAwarded },
-          challengesSolved: { increment: 1 },
+          bugsFixed: { increment: 1 },
         },
       });
 
@@ -140,11 +142,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         create: {
           userId: session.user.id,
           date: today,
-          challengesSolved: 1,
+          bugsFixed: 1,
           xpEarned: xpAwarded,
         },
         update: {
-          challengesSolved: { increment: 1 },
+          bugsFixed: { increment: 1 },
           xpEarned: { increment: xpAwarded },
         },
       });
@@ -155,24 +157,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({
       success: true,
-      submission: {
-        id: submission.id,
-        status: submission.status,
-        testsPassed: passedCount,
-        testsTotal: totalCount,
-        executionTime: avgExecutionTime,
-      },
       results,
       passedCount,
       totalCount,
       allPassed,
       xpAwarded,
-      alreadySolved,
+      alreadyFixed,
     });
   } catch (error) {
-    console.error("Submit code error:", error);
+    console.error("Submit bug fix error:", error);
     return NextResponse.json(
-      { error: "Failed to submit code" },
+      { error: "Failed to submit bug fix" },
       { status: 500 }
     );
   }
@@ -207,7 +202,7 @@ async function updateUserStreak(userId: string) {
     // Continue streak
     newStreak = userStats.currentStreak + 1;
   } else {
-    // Check if today is already counted (user already active today)
+    // Check if today is already counted
     const todayActivity = await prisma.dailyActivity.findUnique({
       where: {
         userId_date: {
@@ -217,7 +212,7 @@ async function updateUserStreak(userId: string) {
       },
     });
 
-    if (todayActivity && todayActivity.challengesSolved > 1) {
+    if (todayActivity && (todayActivity.bugsFixed || 0) > 1) {
       // Already had activity today, don't reset streak
       return;
     }
