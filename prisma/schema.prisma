@@ -1,0 +1,599 @@
+// ==========================================
+// CODE GYM - DATABASE SCHEMA
+// ==========================================
+// Production-ready PostgreSQL schema with full
+// support for all 4 learning modes, gamification,
+// and AI mentor integration.
+// ==========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// AUTHENTICATION & USER MODELS
+// ==========================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  username      String    @unique
+  displayName   String?
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts              Account[]
+  sessions              Session[]
+  preferences           UserPreferences?
+  stats                 UserStats?
+  challengeSubmissions  ChallengeSubmission[]
+  projectSubmissions    ProjectSubmission[]
+  bugSubmissions        BugSubmission[]
+  learningProgress      UserLearningProgress[]
+  learningSubmissions   LearningSubmission[]
+  achievements          UserAchievement[]
+  dailyActivities       DailyActivity[]
+  skillProgress         SkillProgress[]
+  mentorConversations   MentorConversation[]
+  notifications         Notification[]
+
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("password_reset_tokens")
+}
+
+model UserPreferences {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  language           String   @default("en")
+  theme              String   @default("system")
+  preferredLanguages String[] @default(["python", "javascript"])
+  emailNotifications Boolean  @default(true)
+  showHints          Boolean  @default(true)
+  dailyGoal          Int      @default(30) // minutes
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model UserStats {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  totalXp           Int      @default(0)
+  level             Int      @default(1)
+  currentStreak     Int      @default(0)
+  longestStreak     Int      @default(0)
+  streakFreezeUsed  Boolean  @default(false)
+  challengesSolved  Int      @default(0)
+  projectsCompleted Int      @default(0)
+  bugsFixed         Int      @default(0)
+  lessonsCompleted  Int      @default(0)
+  pathsCompleted    Int      @default(0)
+  totalTimeSpent    Int      @default(0) // minutes
+  lastActiveAt      DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([totalXp])
+  @@index([level])
+  @@index([currentStreak])
+  @@map("user_stats")
+}
+
+// ==========================================
+// MASTERY MODE MODELS
+// ==========================================
+
+model Challenge {
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  title             String
+  titleHe           String?
+  description       String   @db.Text
+  descriptionHe     String?  @db.Text
+  difficulty        String   // easy, medium, hard
+  category          String
+  tags              String[]
+  xpReward          Int
+  timeLimit         Int?     // seconds, null = no limit
+  constraints       String   @db.Text
+  examples          Json     // Array of { input, output, explanation? }
+  hints             String[] // Progressive hints
+  architectInsight  String?  @db.Text
+  starterCode       Json     // { python: "...", javascript: "...", ... }
+  solutions         Json     // { python: "...", javascript: "...", ... }
+  testCases         Json     // Array of { id, input, expectedOutput, isHidden }
+  relatedChallenges String[] // Related challenge IDs
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  submissions ChallengeSubmission[]
+
+  @@index([difficulty])
+  @@index([category])
+  @@index([isActive])
+  @@map("challenges")
+}
+
+model ChallengeSubmission {
+  id            String   @id @default(cuid())
+  userId        String
+  challengeId   String
+  code          String   @db.Text
+  language      String
+  status        String   // pending, passed, failed, error
+  executionTime Int?     // milliseconds
+  memoryUsed    Int?     // kilobytes
+  testsPassed   Int      @default(0)
+  testsTotal    Int      @default(0)
+  hintsUsed     Int      @default(0)
+  xpAwarded     Int      @default(0)
+  errorMessage  String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([challengeId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("challenge_submissions")
+}
+
+// ==========================================
+// BUILD MODE MODELS
+// ==========================================
+
+model Project {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  titleHe        String?
+  description    String   @db.Text
+  descriptionHe  String?  @db.Text
+  difficulty     String   // easy, medium, hard
+  techStack      String[]
+  estimatedHours Int
+  xpReward       Int
+  skills         String[]
+  previewImage   String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  milestones  ProjectMilestone[]
+  submissions ProjectSubmission[]
+
+  @@index([difficulty])
+  @@index([isActive])
+  @@map("projects")
+}
+
+model ProjectMilestone {
+  id            String   @id @default(cuid())
+  projectId     String
+  orderIndex    Int
+  title         String
+  titleHe       String?
+  description   String   @db.Text
+  descriptionHe String?  @db.Text
+  instructions  String   @db.Text
+  requirements  String[] // List of requirements
+  starterFiles  Json     // { "filename": "content", ... }
+  testCriteria  Json     // Validation criteria
+  xpReward      Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submissions ProjectSubmission[]
+
+  @@unique([projectId, orderIndex])
+  @@index([projectId])
+  @@map("project_milestones")
+}
+
+model ProjectSubmission {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String
+  milestoneId String
+  files       Json     // { "filename": "content", ... }
+  status      String   // pending, passed, needs_revision, failed
+  aiReview    String?  @db.Text
+  feedback    String?  @db.Text
+  xpAwarded   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone ProjectMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([milestoneId])
+  @@index([status])
+  @@map("project_submissions")
+}
+
+// ==========================================
+// HUNT MODE MODELS
+// ==========================================
+
+model Bug {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  titleHe       String?
+  description   String   @db.Text
+  descriptionHe String?  @db.Text
+  difficulty    String   // easy, medium, hard
+  type          String   // logic, performance, security, edge_case
+  language      String
+  buggyCode     String   @db.Text
+  correctCode   String   @db.Text
+  hint          String?  @db.Text
+  explanation   String   @db.Text
+  explanationHe String?  @db.Text
+  xpReward      Int
+  testCases     Json     // Array of test cases
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  submissions BugSubmission[]
+  dailyHunts  DailyHuntBug[]
+
+  @@index([difficulty])
+  @@index([type])
+  @@index([language])
+  @@index([isActive])
+  @@map("bugs")
+}
+
+model BugSubmission {
+  id        String   @id @default(cuid())
+  userId    String
+  bugId     String
+  fixedCode String   @db.Text
+  status    String   // pending, passed, failed
+  xpAwarded Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bug  Bug  @relation(fields: [bugId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([bugId])
+  @@index([status])
+  @@map("bug_submissions")
+}
+
+model DailyHunt {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date
+  bonusXp   Int      @default(50)
+  createdAt DateTime @default(now())
+
+  bugs DailyHuntBug[]
+
+  @@index([date])
+  @@map("daily_hunts")
+}
+
+model DailyHuntBug {
+  id          String @id @default(cuid())
+  dailyHuntId String
+  bugId       String
+  orderIndex  Int
+
+  dailyHunt DailyHunt @relation(fields: [dailyHuntId], references: [id], onDelete: Cascade)
+  bug       Bug       @relation(fields: [bugId], references: [id], onDelete: Cascade)
+
+  @@unique([dailyHuntId, bugId])
+  @@index([dailyHuntId])
+  @@map("daily_hunt_bugs")
+}
+
+// ==========================================
+// ACADEMY MODE MODELS
+// ==========================================
+
+model LearningPath {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  titleHe        String?
+  description    String   @db.Text
+  descriptionHe  String?  @db.Text
+  difficulty     String   // beginner, intermediate, advanced
+  estimatedHours Int
+  skills         String[]
+  previewImage   String?
+  totalXp        Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  phases   LearningPhase[]
+  progress UserLearningProgress[]
+
+  @@index([difficulty])
+  @@index([isActive])
+  @@map("learning_paths")
+}
+
+model LearningPhase {
+  id            String  @id @default(cuid())
+  pathId        String
+  orderIndex    Int
+  title         String
+  titleHe       String?
+  description   String  @db.Text
+  descriptionHe String? @db.Text
+  deliverable   String? @db.Text
+  xpReward      Int
+
+  path    LearningPath     @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  lessons LearningLesson[]
+
+  @@unique([pathId, orderIndex])
+  @@index([pathId])
+  @@map("learning_phases")
+}
+
+model LearningLesson {
+  id          String  @id @default(cuid())
+  phaseId     String
+  orderIndex  Int
+  title       String
+  titleHe     String?
+  type        String  // concept, exercise, quiz
+  content     String  @db.Text
+  contentHe   String? @db.Text
+  xpReward    Int
+  exercise    Json?   // { instructions, starterCode, solution, testCases }
+  quiz        Json?   // { questions: [{ question, options, correctIndex, explanation }] }
+  videosUrl   String?
+  resourcesLinks Json? // Additional learning resources
+
+  phase       LearningPhase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  submissions LearningSubmission[]
+
+  @@unique([phaseId, orderIndex])
+  @@index([phaseId])
+  @@index([type])
+  @@map("learning_lessons")
+}
+
+model UserLearningProgress {
+  id               String    @id @default(cuid())
+  userId           String
+  pathId           String
+  currentPhaseId   String?
+  currentLessonId  String?
+  completedLessons String[]
+  completedPhases  String[]
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+  lastAccessedAt   DateTime  @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  path LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pathId])
+  @@index([userId])
+  @@index([pathId])
+  @@map("user_learning_progress")
+}
+
+model LearningSubmission {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    String
+  type        String   // exercise, quiz, deliverable
+  content     Json     // Code for exercise, answers for quiz, files for deliverable
+  status      String   // pending, passed, needs_revision, failed
+  score       Int?     // For quizzes: percentage
+  feedback    String?  @db.Text
+  xpAwarded   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson LearningLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lessonId])
+  @@index([type])
+  @@map("learning_submissions")
+}
+
+// ==========================================
+// GAMIFICATION MODELS
+// ==========================================
+
+model Achievement {
+  id            String  @id @default(cuid())
+  slug          String  @unique
+  title         String
+  titleHe       String?
+  description   String
+  descriptionHe String?
+  icon          String
+  tier          String  // bronze, silver, gold, platinum, diamond
+  category      String  // challenges, projects, bugs, academy, streaks, special
+  requirement   Json    // { type: "challenges_solved", value: 10, conditions?: {...} }
+  xpReward      Int
+  isActive      Boolean @default(true)
+
+  userAchievements UserAchievement[]
+
+  @@index([tier])
+  @@index([category])
+  @@index([isActive])
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+  @@map("user_achievements")
+}
+
+model DailyActivity {
+  id               String   @id @default(cuid())
+  userId           String
+  date             DateTime @db.Date
+  challengesSolved Int      @default(0)
+  bugsFixed        Int      @default(0)
+  lessonsCompleted Int      @default(0)
+  xpEarned         Int      @default(0)
+  timeSpent        Int      @default(0) // minutes
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("daily_activities")
+}
+
+model SkillProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  skill     String
+  level     Int      @default(0)
+  xp        Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skill])
+  @@index([userId])
+  @@index([skill])
+  @@map("skill_progress")
+}
+
+// ==========================================
+// AI MENTOR MODELS
+// ==========================================
+
+model MentorConversation {
+  id           String   @id @default(cuid())
+  userId       String
+  contextType  String   // challenge, project, bug, lesson, general
+  contextId    String?
+  messages     Json     // Array of { id, role, content, createdAt }
+  messageCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([contextType])
+  @@index([createdAt])
+  @@map("mentor_conversations")
+}
+
+// ==========================================
+// NOTIFICATION MODEL
+// ==========================================
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String    // achievement, streak, daily_hunt, level_up, milestone, system
+  title     String
+  message   String
+  data      Json?     // Additional data specific to notification type
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}

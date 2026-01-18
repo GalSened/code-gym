@@ -1,0 +1,178 @@
+import NextAuth from "next-auth";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
+import GitHub from "next-auth/providers/github";
+import { prisma } from "@/lib/db";
+import { verifyPassword } from "./password";
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  session: {
+    strategy: "jwt",
+  },
+  pages: {
+    signIn: "/login",
+    signOut: "/logout",
+    error: "/login",
+    verifyRequest: "/verify-email",
+    newUser: "/onboarding",
+  },
+  providers: [
+    Credentials({
+      id: "credentials",
+      name: "Email",
+      credentials: {
+        email: {
+          label: "Email",
+          type: "email",
+          placeholder: "you@example.com",
+        },
+        password: {
+          label: "Password",
+          type: "password",
+        },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required");
+        }
+
+        const email = credentials.email as string;
+        const password = credentials.password as string;
+
+        const user = await prisma.user.findUnique({
+          where: { email: email.toLowerCase() },
+        });
+
+        if (!user || !user.passwordHash) {
+          throw new Error("Invalid email or password");
+        }
+
+        const isValid = await verifyPassword(password, user.passwordHash);
+
+        if (!isValid) {
+          throw new Error("Invalid email or password");
+        }
+
+        if (!user.emailVerified) {
+          throw new Error("Please verify your email before signing in");
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.displayName || user.username,
+          image: user.avatarUrl,
+        };
+      },
+    }),
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      allowDangerousEmailAccountLinking: true,
+    }),
+    GitHub({
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      allowDangerousEmailAccountLinking: true,
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.id = user.id;
+      }
+      if (account) {
+        token.accessToken = account.access_token;
+        token.provider = account.provider;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = token.id as string;
+      }
+      return session;
+    },
+    async signIn({ user, account }) {
+      // For OAuth providers, create/update user preferences and stats if needed
+      if (account?.provider !== "credentials" && user.id) {
+        const existingPrefs = await prisma.userPreferences.findUnique({
+          where: { userId: user.id },
+        });
+
+        if (!existingPrefs) {
+          await prisma.userPreferences.create({
+            data: {
+              userId: user.id,
+              language: "en",
+              theme: "system",
+              preferredLanguages: ["javascript", "python"],
+              emailNotifications: true,
+              showHints: true,
+            },
+          });
+        }
+
+        const existingStats = await prisma.userStats.findUnique({
+          where: { userId: user.id },
+        });
+
+        if (!existingStats) {
+          await prisma.userStats.create({
+            data: {
+              userId: user.id,
+              totalXp: 0,
+              level: 1,
+              currentStreak: 0,
+              longestStreak: 0,
+              challengesSolved: 0,
+              projectsCompleted: 0,
+              bugsFixed: 0,
+              lessonsCompleted: 0,
+              totalTimeSpent: 0,
+            },
+          });
+        }
+      }
+
+      return true;
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      // Create default preferences and stats for new users
+      if (user.id) {
+        await prisma.userPreferences.create({
+          data: {
+            userId: user.id,
+            language: "en",
+            theme: "system",
+            preferredLanguages: ["javascript", "python"],
+            emailNotifications: true,
+            showHints: true,
+          },
+        });
+
+        await prisma.userStats.create({
+          data: {
+            userId: user.id,
+            totalXp: 0,
+            level: 1,
+            currentStreak: 0,
+            longestStreak: 0,
+            challengesSolved: 0,
+            projectsCompleted: 0,
+            bugsFixed: 0,
+            lessonsCompleted: 0,
+            totalTimeSpent: 0,
+          },
+        });
+      }
+    },
+  },
+});
+
+// Re-export password utilities
+export { hashPassword, verifyPassword, validatePassword } from "./password";
