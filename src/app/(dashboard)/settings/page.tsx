@@ -32,8 +32,8 @@ export default async function SettingsPage() {
     >
       <SettingsForm
         initialValues={{
-          theme: preferences.theme,
-          language: preferences.language,
+          theme: preferences.theme as "system" | "light" | "dark",
+          language: preferences.language as "en" | "he",
           preferredLanguages: preferences.preferredLanguages,
           emailNotifications: preferences.emailNotifications,
           showHints: preferences.showHints,
