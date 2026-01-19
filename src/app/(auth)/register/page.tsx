@@ -19,11 +19,22 @@ export default function RegisterPage() {
     setError(null);
 
     try {
+      // Generate a valid username from the display name
+      // - Convert to lowercase
+      // - Replace spaces with underscores
+      // - Remove invalid characters (only allow letters, numbers, _, -)
+      // - Limit to 20 characters
+      const generatedUsername = data.name
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9_-]/g, '')
+        .substring(0, 20);
+
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: data.name,
+          username: generatedUsername,
           displayName: data.name,
           email: data.email,
           password: data.password,
