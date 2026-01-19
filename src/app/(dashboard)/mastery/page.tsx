@@ -174,7 +174,7 @@ export default async function MasteryPage({
       {/* Filters */}
       <Card className="mb-6">
         <CardContent className="pt-4">
-          <form className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <form className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <Input
               name="search"
               placeholder="Search challenges..."

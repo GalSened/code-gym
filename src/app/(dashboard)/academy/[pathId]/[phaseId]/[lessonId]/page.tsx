@@ -352,7 +352,7 @@ export default function LessonPage({ params }: PageProps) {
                     ))}
                   </select>
                 </div>
-                <div className="h-96">
+                <div className="h-64 sm:h-80 md:h-96">
                   <CodeEditor
                     value={exerciseCode}
                     onChange={setExerciseCode}

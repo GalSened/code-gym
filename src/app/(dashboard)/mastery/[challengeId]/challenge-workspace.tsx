@@ -69,6 +69,7 @@ export function ChallengeWorkspace({
   const [activeTab, setActiveTab] = React.useState<"description" | "hints" | "solution">("description");
   const [hintsRevealed, setHintsRevealed] = React.useState(0);
   const [showSolution, setShowSolution] = React.useState(false);
+  const [mobileView, setMobileView] = React.useState<"description" | "code">("code");
 
   // Parse hints, solutions, examples, and starter code from challenge
   const hints = challenge.hints as string[] || [];
@@ -245,10 +246,39 @@ export function ChallengeWorkspace({
         </div>
       </header>
 
+      {/* Mobile view toggle - only visible below lg */}
+      <div className="flex lg:hidden border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <button
+          onClick={() => setMobileView("description")}
+          className={cn(
+            "flex-1 px-4 py-3 text-sm font-medium transition-colors",
+            mobileView === "description"
+              ? "bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border-b-2 border-primary-500"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          )}
+        >
+          Description
+        </button>
+        <button
+          onClick={() => setMobileView("code")}
+          className={cn(
+            "flex-1 px-4 py-3 text-sm font-medium transition-colors",
+            mobileView === "code"
+              ? "bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border-b-2 border-primary-500"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          )}
+        >
+          Code Editor
+        </button>
+      </div>
+
       {/* Main content - split pane */}
-      <div className="flex h-[calc(100vh-3.5rem)]">
+      <div className="flex h-[calc(100vh-6.5rem)] lg:h-[calc(100vh-3.5rem)]">
         {/* Left pane - Problem description */}
-        <div className="w-1/2 border-r border-gray-200 dark:border-gray-800 overflow-y-auto">
+        <div className={cn(
+          "w-full lg:w-1/2 border-r border-gray-200 dark:border-gray-800 overflow-y-auto",
+          mobileView === "description" ? "block" : "hidden lg:block"
+        )}>
           {/* Tabs */}
           <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
             <div className="flex">
@@ -408,7 +438,10 @@ export function ChallengeWorkspace({
         </div>
 
         {/* Right pane - Code editor and results */}
-        <div className="w-1/2 flex flex-col">
+        <div className={cn(
+          "w-full lg:w-1/2 flex-col",
+          mobileView === "code" ? "flex" : "hidden lg:flex"
+        )}>
           {/* Code editor */}
           <div className="flex-1 p-4">
             <CodeEditor
