@@ -17,6 +17,12 @@ export default async function MilestonePage({ params }: PageProps) {
     redirect("/login");
   }
 
+  // Fetch user stats for XP display
+  const userStats = await prisma.userStats.findUnique({
+    where: { userId: session.user.id },
+    select: { totalXp: true },
+  });
+
   const { projectId, milestoneId } = await params;
 
   // Fetch project with all milestones
@@ -90,7 +96,7 @@ export default async function MilestonePage({ params }: PageProps) {
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp: userStats?.totalXp ?? 0 }}
       pageTitle={milestone.title}
       pageDescription={`${project.title} - Milestone ${milestoneIndex + 1}`}
     >

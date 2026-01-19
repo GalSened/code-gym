@@ -26,6 +26,12 @@ export default async function BuildPage({ searchParams }: PageProps) {
     redirect("/login");
   }
 
+  // Fetch user stats for XP display
+  const userStats = await prisma.userStats.findUnique({
+    where: { userId: session.user.id },
+    select: { totalXp: true },
+  });
+
   const params = await searchParams;
   const difficultyFilter = params.difficulty;
 
@@ -73,7 +79,7 @@ export default async function BuildPage({ searchParams }: PageProps) {
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp: userStats?.totalXp ?? 0 }}
       pageTitle="Build Mode"
       pageDescription="Learn by building real-world projects step by step"
     >

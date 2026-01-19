@@ -89,6 +89,7 @@ export interface DashboardLayoutProps {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    totalXp?: number;
   };
   className?: string;
   pageTitle?: string;

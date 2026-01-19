@@ -16,6 +16,12 @@ export default async function ProjectPage({ params }: PageProps) {
     redirect("/login");
   }
 
+  // Fetch user stats for XP display
+  const userStats = await prisma.userStats.findUnique({
+    where: { userId: session.user.id },
+    select: { totalXp: true },
+  });
+
   const { projectId } = await params;
 
   // Fetch project with milestones
@@ -65,7 +71,7 @@ export default async function ProjectPage({ params }: PageProps) {
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp: userStats?.totalXp ?? 0 }}
       pageTitle={project.title}
       pageDescription="Build your project step by step"
     >

@@ -12,6 +12,7 @@ export interface NavbarProps {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    totalXp?: number;
   } | null;
 }
 
@@ -63,9 +64,9 @@ export function Navbar({ user }: NavbarProps) {
           <div className="flex items-center gap-4">
             {user ? (
               <>
-                {/* XP Display (placeholder) */}
+                {/* XP Display */}
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/30 rounded-full">
-                  <span className="text-primary-600 dark:text-primary-400 font-medium text-sm">⚡ 1,250 XP</span>
+                  <span className="text-primary-600 dark:text-primary-400 font-medium text-sm">⚡ {(user.totalXp ?? 0).toLocaleString()} XP</span>
                 </div>
 
                 {/* User Menu */}

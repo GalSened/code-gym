@@ -26,6 +26,12 @@ export default async function HuntPage({
     redirect("/login");
   }
 
+  // Fetch user stats for XP display
+  const userStats = await prisma.userStats.findUnique({
+    where: { userId: session.user.id },
+    select: { totalXp: true },
+  });
+
   const params = await searchParams;
   const difficulty = params.difficulty || "all";
   const type = params.type || "all";
@@ -145,7 +151,7 @@ export default async function HuntPage({
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp: userStats?.totalXp ?? 0 }}
       pageTitle="Hunt Mode"
       pageDescription="Find and fix bugs to sharpen your debugging skills"
     >

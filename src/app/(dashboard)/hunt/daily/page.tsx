@@ -27,6 +27,12 @@ export default async function DailyHuntPage() {
     redirect("/login");
   }
 
+  // Fetch user stats for XP display
+  const userStats = await prisma.userStats.findUnique({
+    where: { userId: session.user.id },
+    select: { totalXp: true },
+  });
+
   // Get today's date at midnight
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -81,7 +87,7 @@ export default async function DailyHuntPage() {
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp: userStats?.totalXp ?? 0 }}
       pageTitle="Daily Hunt"
       pageDescription="Complete today's bug challenges for bonus XP"
     >

@@ -140,7 +140,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp }}
       pageTitle={`Welcome back, ${session.user.name?.split(" ")[0] || "Coder"}!`}
       pageDescription="Track your progress and continue your coding journey"
     >

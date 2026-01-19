@@ -25,6 +25,12 @@ export default async function MasteryPage({
     redirect("/login");
   }
 
+  // Fetch user stats for XP display
+  const userStats = await prisma.userStats.findUnique({
+    where: { userId: session.user.id },
+    select: { totalXp: true },
+  });
+
   const params = await searchParams;
   const difficulty = params.difficulty || "all";
   const category = params.category || "all";
@@ -129,7 +135,7 @@ export default async function MasteryPage({
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp: userStats?.totalXp ?? 0 }}
       pageTitle="Mastery Mode"
       pageDescription="Practice coding challenges and level up your skills"
     >

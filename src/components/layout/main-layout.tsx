@@ -11,6 +11,7 @@ export interface MainLayoutProps {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    totalXp?: number;
   } | null;
   sidebarItems?: {
     label: string;

@@ -11,6 +11,12 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
+  // Fetch user stats for XP display
+  const userStats = await prisma.userStats.findUnique({
+    where: { userId: session.user.id },
+    select: { totalXp: true },
+  });
+
   // Get or create user preferences
   let preferences = await prisma.userPreferences.findUnique({
     where: { userId: session.user.id },
@@ -26,7 +32,7 @@ export default async function SettingsPage() {
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp: userStats?.totalXp ?? 0 }}
       pageTitle="Settings"
       pageDescription="Manage your account preferences"
     >

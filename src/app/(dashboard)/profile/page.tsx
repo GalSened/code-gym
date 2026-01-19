@@ -92,7 +92,7 @@ export default async function ProfilePage() {
 
   return (
     <DashboardLayout
-      user={session.user}
+      user={{ ...session.user, totalXp }}
       pageTitle="Profile"
       pageDescription="View your progress and achievements"
     >
