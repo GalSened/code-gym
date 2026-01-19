@@ -1,9 +1,16 @@
 import Groq from "groq-sdk";
 
-// Initialize Groq client
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+// Lazy-initialize Groq client to avoid build-time errors
+let groqClient: Groq | null = null;
+
+function getGroqClient(): Groq {
+  if (!groqClient) {
+    groqClient = new Groq({
+      apiKey: process.env.GROQ_API_KEY,
+    });
+  }
+  return groqClient;
+}
 
 // Default model to use
 const DEFAULT_MODEL = "llama-3.1-70b-versatile";
@@ -80,7 +87,7 @@ ${content.slice(0, 15000)}
 Provide your analysis as valid JSON.`;
 
   try {
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroqClient().chat.completions.create({
       model: DEFAULT_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
@@ -148,7 +155,7 @@ ${symbolCode.slice(0, 8000)}
 Provide your analysis as valid JSON.`;
 
   try {
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroqClient().chat.completions.create({
       model: DEFAULT_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
@@ -221,7 +228,7 @@ ${f.content.slice(0, 3000)}
 Provide your analysis as valid JSON.`;
 
   try {
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroqClient().chat.completions.create({
       model: DEFAULT_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
@@ -298,7 +305,7 @@ Be concise but thorough. Use code examples when helpful.`;
   contextMessages.push(...messages);
 
   try {
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroqClient().chat.completions.create({
       model: DEFAULT_MODEL,
       messages: contextMessages.map((m) => ({
         role: m.role,
@@ -330,7 +337,7 @@ Code:
 ${content.slice(0, 5000)}`;
 
   try {
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroqClient().chat.completions.create({
       model: DEFAULT_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
