@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { executeCode, wrapCodeWithTestHarness, compareOutputs } from "@/lib/services/piston";
-import { TestCase } from "@/types";
+import { executeTestsSequentially, TestCaseInput, TestResult } from "@/lib/services/piston";
 
 interface RouteParams {
   params: Promise<{ challengeId: string }>;
@@ -61,27 +60,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const alreadySolved = !!existingPassedSubmission;
 
     // Parse all test cases from JSON field
-    const allTestCases = (challenge.testCases as unknown) as TestCase[];
+    const allTestCases = (challenge.testCases as unknown) as TestCaseInput[];
 
-    // Run code against ALL test cases
-    const results = await Promise.all(
-      allTestCases.map(async (testCase: TestCase) => {
-        const wrappedCode = wrapCodeWithTestHarness(code, language, testCase.input);
-        const result = await executeCode(wrappedCode, language, undefined, 10000);
-        const passed = result.success && compareOutputs(testCase.expectedOutput, result.output);
+    // Run code against ALL test cases sequentially to respect rate limits
+    const rawResults = await executeTestsSequentially(code, language, allTestCases, 10000);
 
-        return {
-          id: testCase.id,
-          input: testCase.isHidden ? "[Hidden]" : testCase.input,
-          expectedOutput: testCase.isHidden ? "[Hidden]" : testCase.expectedOutput,
-          actualOutput: testCase.isHidden ? (passed ? "[Correct]" : "[Incorrect]") : result.output,
-          passed,
-          error: testCase.isHidden ? undefined : result.error,
-          executionTime: result.executionTime,
-          isHidden: testCase.isHidden,
-        };
-      })
-    );
+    // Map results to include hidden test case handling
+    const results = rawResults.map((result: TestResult, index: number) => {
+      const testCase = allTestCases[index];
+      const isHidden = testCase?.isHidden ?? false;
+
+      return {
+        id: result.id,
+        input: isHidden ? "[Hidden]" : result.input,
+        expectedOutput: isHidden ? "[Hidden]" : result.expectedOutput,
+        actualOutput: isHidden ? (result.passed ? "[Correct]" : "[Incorrect]") : result.actualOutput,
+        passed: result.passed,
+        error: isHidden ? undefined : result.error,
+        executionTime: result.executionTime,
+        isHidden,
+      };
+    });
 
     const passedCount = results.filter((r) => r.passed).length;
     const totalCount = results.length;

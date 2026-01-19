@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { executeCode, wrapCodeWithTestHarness, compareOutputs } from "@/lib/services/piston";
+import { executeTestsSequentially, TestCaseInput } from "@/lib/services/piston";
 
 interface RouteParams {
   params: Promise<{ bugId: string }>;
-}
-
-interface TestCase {
-  id: string;
-  input: string;
-  expectedOutput: string;
-  isHidden?: boolean;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -49,32 +42,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Parse test cases from JSON field - only visible ones for run
-    const allTestCases = (bug.testCases as unknown) as TestCase[];
+    const allTestCases = (bug.testCases as unknown) as TestCaseInput[];
     const visibleTestCases = allTestCases.filter((tc) => !tc.isHidden);
 
-    // Run code against each visible test case
-    const results = await Promise.all(
-      visibleTestCases.map(async (testCase) => {
-        // Wrap code with test harness
-        const wrappedCode = wrapCodeWithTestHarness(code, language, testCase.input);
-
-        // Execute the code
-        const result = await executeCode(wrappedCode, language, undefined, 10000);
-
-        // Compare output
-        const passed = result.success && compareOutputs(testCase.expectedOutput, result.output);
-
-        return {
-          id: testCase.id,
-          input: testCase.input,
-          expectedOutput: testCase.expectedOutput,
-          actualOutput: result.output,
-          passed,
-          error: result.error,
-          executionTime: result.executionTime,
-        };
-      })
-    );
+    // Run code against each visible test case sequentially to respect rate limits
+    const results = await executeTestsSequentially(code, language, visibleTestCases, 10000);
 
     const passedCount = results.filter((r) => r.passed).length;
     const totalCount = results.length;

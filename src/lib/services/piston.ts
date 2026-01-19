@@ -140,6 +140,71 @@ export async function executeCode(
   }
 }
 
+
+/**
+ * Execute multiple test cases sequentially with delays to respect API rate limits
+ * The Piston API has a rate limit of 1 request per 200ms
+ */
+export interface TestCaseInput {
+  id: string;
+  input: string;
+  expectedOutput: string;
+  isHidden?: boolean;
+}
+
+export interface TestResult {
+  id: string;
+  input: string;
+  expectedOutput: string;
+  actualOutput: string;
+  passed: boolean;
+  error?: string;
+  executionTime?: number;
+}
+
+export async function executeTestsSequentially(
+  code: string,
+  language: string,
+  testCases: TestCaseInput[],
+  timeout: number = 10000
+): Promise<TestResult[]> {
+  const results: TestResult[] = [];
+  const RATE_LIMIT_DELAY = 250; // 250ms delay to respect 200ms rate limit with margin
+
+  for (let i = 0; i < testCases.length; i++) {
+    const testCase = testCases[i];
+
+    // Skip if testCase is undefined (shouldn't happen but satisfies TypeScript)
+    if (!testCase) continue;
+
+    // Add delay between requests (except for the first one)
+    if (i > 0) {
+      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY));
+    }
+
+    // Wrap code with test harness
+    const wrappedCode = wrapCodeWithTestHarness(code, language, testCase.input);
+
+    // Execute the code
+    const result = await executeCode(wrappedCode, language, undefined, timeout);
+
+    // Compare output
+    const passed = result.success && compareOutputs(testCase.expectedOutput, result.output);
+
+    results.push({
+      id: testCase.id,
+      input: testCase.input,
+      expectedOutput: testCase.expectedOutput,
+      actualOutput: result.output,
+      passed,
+      error: result.error,
+      executionTime: result.executionTime,
+    });
+  }
+
+  return results;
+}
+
 /**
  * Get file name based on language
  */
@@ -183,6 +248,39 @@ export async function getAvailableRuntimes(): Promise<
 }
 
 /**
+ * Extract the main function name from code based on language
+ */
+function extractFunctionName(code: string, language: string): string {
+  let match: RegExpMatchArray | null = null;
+
+  switch (language) {
+    case "javascript":
+    case "typescript":
+      // Match: function name( or const/let/var name = or name = function(
+      match = code.match(/(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:function|\(|async))/);
+      break;
+    case "python":
+      // Match: def name(
+      match = code.match(/def\s+(\w+)\s*\(/);
+      break;
+    case "go":
+      // Match: func name(
+      match = code.match(/func\s+(\w+)\s*\(/);
+      break;
+    case "java":
+      // Match: public static ... name(
+      match = code.match(/public\s+static\s+\w+\s+(\w+)\s*\(/);
+      break;
+  }
+
+  // Return the first captured group that exists
+  if (match) {
+    return match[1] || match[2] || "solution";
+  }
+  return "solution";
+}
+
+/**
  * Wrap user code with test harness based on language
  */
 export function wrapCodeWithTestHarness(
@@ -193,6 +291,9 @@ export function wrapCodeWithTestHarness(
   // For simple test cases, we can pass input via stdin
   // The user's function should read from stdin or be called with the input
 
+  // Extract the actual function name from the code
+  const funcName = extractFunctionName(code, language);
+
   switch (language) {
     case "javascript":
     case "typescript":
@@ -202,7 +303,7 @@ ${code}
 // Test harness
 const input = ${JSON.stringify(testInput)};
 try {
-  const result = solution(JSON.parse(input));
+  const result = ${funcName}(JSON.parse(input));
   console.log(JSON.stringify(result));
 } catch (e) {
   console.error(e.message);
@@ -221,7 +322,7 @@ ${code}
 if __name__ == "__main__":
     input_data = ${JSON.stringify(testInput)}
     try:
-        result = solution(json.loads(input_data))
+        result = ${funcName}(json.loads(input_data))
         print(json.dumps(result))
     except Exception as e:
         print(str(e), file=sys.stderr)
@@ -241,7 +342,7 @@ class Main {
         String input = ${JSON.stringify(testInput)};
         try {
             Object parsed = gson.fromJson(input, Object.class);
-            Object result = Solution.solution(parsed);
+            Object result = Solution.${funcName}(parsed);
             System.out.println(gson.toJson(result));
         } catch (Exception e) {
             System.err.println(e.getMessage());
@@ -270,7 +371,7 @@ func main() {
         fmt.Fprintln(os.Stderr, err)
         os.Exit(1)
     }
-    result := solution(parsed)
+    result := ${funcName}(parsed)
     output, _ := json.Marshal(result)
     fmt.Println(string(output))
 }

@@ -13,9 +13,17 @@ export function LogoutContent() {
   React.useEffect(() => {
     const performSignOut = async () => {
       try {
+        // Clear the session
         await signOut({ redirect: false });
-        router.push("/login");
+
+        // Refresh the router cache to clear any stale session data
         router.refresh();
+
+        // Small delay to ensure session is fully cleared before redirect
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Navigate to login page
+        router.push("/login");
       } catch {
         setError("Failed to sign out. Please try again.");
         setIsLoading(false);
@@ -32,13 +40,18 @@ export function LogoutContent() {
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
         <Button
-          onClick={() => {
+          onClick={async () => {
             setError(null);
             setIsLoading(true);
-            signOut({ redirect: false }).then(() => {
-              router.push("/login");
+            try {
+              await signOut({ redirect: false });
               router.refresh();
-            });
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              router.push("/login");
+            } catch {
+              setError("Failed to sign out. Please try again.");
+              setIsLoading(false);
+            }
           }}
         >
           Try Again

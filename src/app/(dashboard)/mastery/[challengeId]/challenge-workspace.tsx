@@ -57,9 +57,12 @@ export function ChallengeWorkspace({
   const [language, setLanguage] = React.useState<Language>(
     (previousLanguage as Language) || "javascript"
   );
-  const [code, setCode] = React.useState(
-    previousCode || starterCodeTemplates[language] || ""
-  );
+  const [code, setCode] = React.useState(() => {
+    if (previousCode) return previousCode;
+    const starterCode = challenge.starterCode as Record<string, string> | null;
+    const lang = (previousLanguage as Language) || "javascript";
+    return starterCode?.[lang] || starterCodeTemplates[lang] || "";
+  });
   const [isRunning, setIsRunning] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [runResult, setRunResult] = React.useState<RunResult | null>(null);
@@ -67,15 +70,23 @@ export function ChallengeWorkspace({
   const [hintsRevealed, setHintsRevealed] = React.useState(0);
   const [showSolution, setShowSolution] = React.useState(false);
 
-  // Parse hints, solutions, and examples from challenge
+  // Parse hints, solutions, examples, and starter code from challenge
   const hints = challenge.hints as string[] || [];
   const solutions = challenge.solutions as Record<string, string> | null;
   const examples = challenge.examples as { input: string; output: string; explanation?: string }[] || [];
+  const challengeStarterCode = challenge.starterCode as Record<string, string> | null;
+
+  // Get starter code for a language (use challenge-specific or fall back to generic template)
+  const getStarterCode = (lang: Language): string => {
+    return challengeStarterCode?.[lang] || starterCodeTemplates[lang] || "";
+  };
 
   // Handle language change
   const handleLanguageChange = (newLanguage: Language) => {
-    if (code === starterCodeTemplates[language] || code === "") {
-      setCode(starterCodeTemplates[newLanguage] || "");
+    const currentStarterCode = getStarterCode(language);
+    // Update code if it matches the current starter code or is empty
+    if (code === currentStarterCode || code === "" || code === starterCodeTemplates[language]) {
+      setCode(getStarterCode(newLanguage));
     }
     setLanguage(newLanguage);
   };

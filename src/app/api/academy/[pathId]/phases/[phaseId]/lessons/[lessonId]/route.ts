@@ -60,9 +60,18 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const userProgress = lesson.phase.path.progress[0] || null;
-    const completedLessons = userProgress?.completedLessons || [];
-    const completedPhases = userProgress?.completedPhases || [];
+    const userProgress = lesson.phase.path.progress[0];
+
+    // Check if user is enrolled in this learning path
+    if (!userProgress) {
+      return NextResponse.json(
+        { error: "Not enrolled in this learning path" },
+        { status: 403 }
+      );
+    }
+
+    const completedLessons = userProgress.completedLessons || [];
+    const completedPhases = userProgress.completedPhases || [];
 
     // Check if lesson is accessible
     const phaseIndex = lesson.phase.path.phases.findIndex(
