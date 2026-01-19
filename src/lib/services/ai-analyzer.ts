@@ -13,7 +13,7 @@ function getGroqClient(): Groq {
 }
 
 // Default model to use
-const DEFAULT_MODEL = "llama-3.1-70b-versatile";
+const DEFAULT_MODEL = "openai/gpt-oss-120b";
 
 // Types for analysis results
 export interface FileExplanation {
