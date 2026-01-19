@@ -139,7 +139,7 @@ export default async function ProjectPage({ params }: PageProps) {
           {/* Skills */}
           <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Skills You'll Learn
+              Skills You&apos;ll Learn
             </h3>
             <div className="flex flex-wrap gap-2">
               {project.skills.map((skill) => (
@@ -277,7 +277,7 @@ export default async function ProjectPage({ params }: PageProps) {
             </svg>
             <h3 className="text-xl font-bold mb-2">Project Completed!</h3>
             <p className="text-green-100">
-              Congratulations! You've completed all milestones and earned {project.xpReward} XP.
+              Congratulations! You&apos;ve completed all milestones and earned {project.xpReward} XP.
             </p>
           </CardContent>
         </Card>

@@ -53,7 +53,7 @@ export default async function DailyHuntPage() {
   });
 
   // Get user's submissions for today's bugs
-  let userSubmissions: Map<string, string> = new Map();
+  const userSubmissions: Map<string, string> = new Map();
   if (dailyHunt) {
     const bugIds = dailyHunt.bugs.map((b) => b.bugId);
     const submissions = await prisma.bugSubmission.findMany({

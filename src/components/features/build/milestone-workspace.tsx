@@ -128,7 +128,7 @@ export function MilestoneWorkspace({
           router.refresh();
         }, 2000);
       }
-    } catch (error) {
+    } catch {
       setSubmitResult({
         success: false,
         status: "error",

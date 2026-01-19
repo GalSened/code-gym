@@ -395,7 +395,7 @@ export async function checkRepositoryAccess(
       hasAccess: true,
       isPrivate: data.private,
     };
-  } catch (error) {
+  } catch {
     // 404 means no access or doesn't exist
     return {
       hasAccess: false,

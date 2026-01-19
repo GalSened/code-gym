@@ -218,7 +218,7 @@ export default async function MilestonePage({ params }: PageProps) {
             </svg>
             <h3 className="text-xl font-bold mb-2">Project Completed!</h3>
             <p className="text-green-100 mb-4">
-              Congratulations! You've completed all milestones for {project.title}.
+              Congratulations! You&apos;ve completed all milestones for {project.title}.
             </p>
             <Link href="/build">
               <Button variant="secondary">
