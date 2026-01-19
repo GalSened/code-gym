@@ -229,9 +229,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         create: {
           userId: session.user.id,
           totalXp: xpAwarded,
+          lessonsCompleted: 1,
         },
         update: {
           totalXp: { increment: xpAwarded },
+          lessonsCompleted: { increment: 1 },
         },
       });
 
@@ -290,6 +292,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           where: { userId: session.user.id },
           data: {
             totalXp: { increment: pathBonus },
+            pathsCompleted: { increment: 1 },
           },
         });
 
